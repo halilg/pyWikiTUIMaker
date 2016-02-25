@@ -18,8 +18,6 @@ class _Textbox(textpad.Textbox):
         
     def do_command(self, ch):
         och=ch
-        # if ch == 10: # Enter
-            # return 0
         if ch == 9: # tab
             self.lastKey = 9
             return 0
@@ -40,10 +38,34 @@ class widget(object):
         self.name=name
         self.label=""
         self.win=win
+        self.lastKey=0
 
     def printLabel(self):
         self.win.addstr(self.posY,self.posX, self.label)
         
+class wButton(widget):
+    
+    def __init__(self, name, win, y, x, label):
+        super(self.__class__,self).__init__(name, win) # Call the init method of the base class
+        self.posX=x
+        self.posY=y
+        self.label=label
+        type="x"
+        self.__exit_keys=[curses.KEY_ENTER, 32, 27, 9, 10]
+    
+    def printField(self):
+        self.win.addstr(self.posY,self.posX , "[ ", curses.A_REVERSE)
+        self.win.addstr(self.posY,self.posX + 2 + len(self.label) , " ]", curses.A_REVERSE)
+        self.win.addstr(self.posY,self.posX + 2 , self.label, curses.A_REVERSE)
+        
+    def setFocus(self):
+        self.win.move(self.posY,self.posX + 2)
+        while True:
+            c = self.win.getch()
+            self.lastKey = c
+            if c in self.__exit_keys:
+                return 
+
 
 class wTextBox(widget):
     
@@ -53,18 +75,17 @@ class wTextBox(widget):
         self.posY=y
         self.fieldSize=size
         self.label=label
+        self.text=""
         type="t"
         self.swin = win.subwin(1, self.fieldSize+1, self.posY,self.posX + 3 + len(self.label)) #nlines, ncols, begin_y, begin_x
         # self.swin.bkgd(' ', curses.color_pair(1))
         self.win.refresh()
         self.swin.refresh()
         
-    # def __validate(self, c):
-    #     self.win.addstr(9,1,str(c))
-    #     self.win.refresh()
-    #     # if c == 330:
-    #         # textpad.do_command(curses.KEY_BACKSPACE)
-    #     return c
+    def __validate(self, c):
+        self.win.addstr(9,1,str(c))
+        self.win.refresh()
+        return c
         
     def printField(self):
         self.win.addstr(self.posY,self.posX + 2 + len(self.label), "[")
@@ -72,9 +93,12 @@ class wTextBox(widget):
         
     def setFocus(self):
         self.swin.move(0,0)#(self.posY,self.posX + 3 + len(self.label))
-        mytext=_Textbox(self.swin, insert_mode=True).edit()
-        self.win.addstr(10,1,mytext)
-        # self.win.addstr(11,1,_Textbox.lastKey)
+        tb=_Textbox(self.swin, insert_mode=True)
+        self.text=tb.edit(self.__validate)
+        # self.win.addstr(10,1,self.text)
+        # self.win.addstr(11,1,str(tb.lastKey))
+        self.lastKey = tb.lastKey
+        return #tb.lastKey
         
 
 def init():
@@ -104,13 +128,16 @@ def draw_screen(win):
     win.addstr(4,1, "Choose File [...]")
     win.addstr(5,1, " Choose Asd [...|v]")
     win.addstr(6,1, "        Age [     ]")
-    win.addstr(8,1, "          [OK]")
+    # win.addstr(8,1, "          [OK]")
 
 def define_widgets(win):
     widgets = []
     t0=wTextBox("t0", win, 2, 7, 10, "Name")
-    
+    t1=wTextBox("t1", win, 9, 7, 10, "Surname")
+    b0=wButton("b0", win, 8, 10, "OK")
     widgets.append(t0)
+    widgets.append(t1)
+    widgets.append(b0)
     return widgets
      
 def main(stdscr):
@@ -124,13 +151,24 @@ def main(stdscr):
         widget.printLabel()
         widget.printField()
         screen.refresh()
-    widgets[0].setFocus()
     
+    focus=0
     while True:
-        c = screen.getch()
-        print c
-        if c == ord("q"):
-            break
+        screen.addstr(1,30, str(focus))
+        screen.addstr(2,30, widgets[focus].name)
+        screen.refresh()
+        widgets[focus].setFocus()
+        lastkey=widgets[focus].lastKey
+        screen.addstr(3,30, str(lastkey))
+        screen.refresh()
+        
+        if widgets[focus].name=="b0":
+            if lastkey == 10: #enter
+                quit(stdscr)
+                print widgets[0].text
+                print widgets[1].text
+                sys.exit()
+        focus=(focus+1) % len(widgets)
             
 if __name__ == '__main__':
     # curses.curs_set(visibility)
