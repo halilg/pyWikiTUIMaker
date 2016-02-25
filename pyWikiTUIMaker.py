@@ -4,6 +4,35 @@
 import os, sys, curses, traceback
 import curses.textpad as textpad
 
+class _Textbox(textpad.Textbox):
+    """
+    Class code taken from: http://nullege.com/codes/show/src%40p%40y%40pyaxo-HEAD%40examples%40axochat.py/85/curses.textpad.Textbox.do_command/python
+    curses.textpad.Textbox requires users to ^g on completion, which is sort
+    of annoying for an interactive chat client such as this, which typically only
+    reuquires an enter. This subclass fixes this problem by signalling completion
+    on Enter as well as ^g. Also, map <Backspace> key to ^h.
+    """
+    def __init__(*args, **kwargs):
+        textpad.Textbox.__init__(*args, **kwargs)
+        lastKey = 0
+        
+    def do_command(self, ch):
+        och=ch
+        # if ch == 10: # Enter
+            # return 0
+        if ch == 9: # tab
+            self.lastKey = 9
+            return 0
+        if ch == 127: # Backspace
+            # return curses.KEY_BACKSPACE
+            och=curses.KEY_BACKSPACE
+        if ch == 360: # End
+            och=562
+        if ch == 262: # Home
+            och=162
+        self.lastKey = och
+        return textpad.Textbox.do_command(self, och)
+
 class widget(object):
     desc="widget"
     
@@ -25,18 +54,27 @@ class wTextBox(widget):
         self.fieldSize=size
         self.label=label
         type="t"
-        self.swin = win.subwin(1, self.fieldSize, self.posY,self.posX + 3 + len(self.label)) #nlines, ncols, begin_y, begin_x
+        self.swin = win.subwin(1, self.fieldSize+1, self.posY,self.posX + 3 + len(self.label)) #nlines, ncols, begin_y, begin_x
         # self.swin.bkgd(' ', curses.color_pair(1))
         self.win.refresh()
         self.swin.refresh()
+        
+    # def __validate(self, c):
+    #     self.win.addstr(9,1,str(c))
+    #     self.win.refresh()
+    #     # if c == 330:
+    #         # textpad.do_command(curses.KEY_BACKSPACE)
+    #     return c
+        
     def printField(self):
         self.win.addstr(self.posY,self.posX + 2 + len(self.label), "[")
-        self.win.addstr(self.posY,self.posX + 2 + len(self.label) + self.fieldSize, "]")
+        self.win.addstr(self.posY,self.posX + 4 + len(self.label) + self.fieldSize, "]")
         
     def setFocus(self):
         self.swin.move(0,0)#(self.posY,self.posX + 3 + len(self.label))
-        mytext=textpad.Textbox(self.swin, insert_mode=True).edit()
-        # self.win.addstr(10,1,mytext)
+        mytext=_Textbox(self.swin, insert_mode=True).edit()
+        self.win.addstr(10,1,mytext)
+        # self.win.addstr(11,1,_Textbox.lastKey)
         
 
 def init():
