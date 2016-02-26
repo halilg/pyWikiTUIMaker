@@ -71,8 +71,10 @@ class wTextBox(widget):
         self.fieldSize=size
         self.default=default
         self.text=default
+        if len(self.text) > self.fieldSize: self.text = self.text[:self.fieldSize]
         self.type="t"
         self.swin = self.win.subwin(1, self.fieldSize+1, self.posY,self.posX + 3 + len(self.label)) #nlines, ncols, begin_y, begin_x
+        self.swin.addstr(0, 0, self.text)
         self.win.refresh()
         self.swin.refresh()
         
@@ -109,8 +111,18 @@ class window():
         self.win = curses.newwin(y1, x1, y2, x2)#(23, 79, 0, 0)
         self.win.bkgd(' ', curses.color_pair(1))
         self.win.box()
+        self.__signal=0
 
+    def loop(self):
+        self.__draw()
+    
     def __draw(self):
+        for w in self.widgets.keys():
+            self.widgets[w].printLabel()
+            self.widgets[w].printField()
+        self.win.refresh()
+
+    def signal(sig):
         pass
 
     def callback(self, data):
@@ -130,7 +142,7 @@ def callback():
 
 def define_widgets(parent):
     widgets = []
-    t0=wTextBox("t0", 2, 7, 10, "Name", parent)
+    t0=wTextBox("t0", 2, 7, 10, "Name", parent, "12345678901")
     t1=wTextBox("t1", 9, 7, 10, "Surname", parent)
     b0=wButton("b0", 8, 10, "OK", parent)
     widgets.append(t0)
@@ -139,19 +151,16 @@ def define_widgets(parent):
     return widgets
      
 def main(stdscr):
-    # Frame the interface area at fixed VT100 size
     mwindow=window("main",0, 0, 0, 0)
     win=mwindow.win
     # screen = curses.newwin(0, 0, 0, 0)#(23, 79, 0, 0)
     # screen.bkgd(' ', curses.color_pair(1))
     # screen.box()
-    draw_screen(win)
+    # draw_screen(win)
     widgets=define_widgets(mwindow)
     # win.addstr(1,30, str(mwindow.widgets))
-    for widget in widgets:
-        widget.printLabel()
-        widget.printField()
-        win.refresh()
+    # for widget in widgets:
+    mwindow.loop()
     
     focus=0
     while True:
