@@ -38,7 +38,7 @@ class widget(object):
         self.win=parent.win
         #register self to parent
         self.parent.widgets[self.name]=self
-
+        
     def printLabel(self):
         self.win.addstr(self.posY,self.posX, self.label)
         
@@ -60,6 +60,7 @@ class wButton(widget):
         self.printField(curses.A_REVERSE)
         while True:
             c = self.win.getch()
+            self.parent.callback(self, "keypress", c)
             self.lastKey = c
             if c in self.__exit_keys:
                 self.printField()
@@ -98,9 +99,10 @@ class wTextBox(widget):
         return #tb.lastKey
 
 class window():
-    def __init__(self, name, y1, x1, y2, x2, label=""):
+    def __init__(self, name, y1, x1, y2, x2, callback, label=""):
         from collections import OrderedDict
         self.name=name
+        self.__callback = callback
         # self.screen=screen
         self.y1=y1
         self.x1=x1
@@ -115,6 +117,18 @@ class window():
 
     def loop(self):
         self.__draw()
+        focus=0
+        while True:
+            # screen.addstr(1,30, str(focus))
+            # screen.addstr(2,30, widgets[focus].name)
+            # self.win.refresh()
+            iWidget=self.widgets.keys()[focus]
+            self.widgets[iWidget].setFocus()
+            lastkey=self.widgets[iWidget].lastKey
+            # screen.addstr(3,30, str(lastkey))
+            self.win.refresh()
+            if self.__signal != 0 : break            
+            focus=(focus+1) % len(self.widgets)
     
     def __draw(self):
         for w in self.widgets.keys():
@@ -122,11 +136,14 @@ class window():
             self.widgets[w].printField()
         self.win.refresh()
 
-    def signal(sig):
-        pass
+    def signal(self, sig):
+        self.__signal=sig
 
-    def callback(self, data):
-        pass
+    def callback(self, obj, event, data):
+        text = ",".join([obj.name, event, str(data)])
+        self.win.addstr(15,1, text)
+        self.win.refresh()
+        self.__callback(obj, event, data)
 
 def draw_screen(win):
     # win.addstr(2,1, "       Name [     ]")
@@ -136,9 +153,12 @@ def draw_screen(win):
     win.addstr(6,1, "        Age [     ]")
     # win.addstr(8,1, "          [OK]")
 
-def callback():
-    pass
-
+def callback(obj, event, data):
+    if obj.name=="b0":
+        if data == 10: #enter
+            print obj.parent.widgets["t0"].text
+            print obj.parent.widgets["t1"].text
+            obj.parent.signal(1)
 
 def define_widgets(parent):
     widgets = []
@@ -151,7 +171,7 @@ def define_widgets(parent):
     return widgets
      
 def main(stdscr):
-    mwindow=window("main",0, 0, 0, 0)
+    mwindow=window("main",0, 0, 0, 0, callback)
     win=mwindow.win
     # screen = curses.newwin(0, 0, 0, 0)#(23, 79, 0, 0)
     # screen.bkgd(' ', curses.color_pair(1))
@@ -161,24 +181,6 @@ def main(stdscr):
     # win.addstr(1,30, str(mwindow.widgets))
     # for widget in widgets:
     mwindow.loop()
-    
-    focus=0
-    while True:
-        # screen.addstr(1,30, str(focus))
-        # screen.addstr(2,30, widgets[focus].name)
-        win.refresh()
-        widgets[focus].setFocus()
-        lastkey=widgets[focus].lastKey
-        # screen.addstr(3,30, str(lastkey))
-        win.refresh()
-        
-        if widgets[focus].name=="b0":
-            if lastkey == 10: #enter
-                quit_curses(stdscr)
-                print widgets[0].text
-                print widgets[1].text
-                sys.exit()
-        focus=(focus+1) % len(widgets)
 
 def init_curses():
     stdscr=curses.initscr()
