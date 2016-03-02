@@ -102,6 +102,7 @@ class window():
         self.name=name
         self.__callback = callback
         self.__parent = parent
+        self.__parent.windows.append(self)
         # self.screen=screen
         self.y1=y1
         self.x1=x1
@@ -130,9 +131,8 @@ class window():
         if key == 9  : #tab, move focus to next widget
             
             self.widgets[iWidget].setFocus()
-            lastkey=self.widgets[iWidget].lastKey
             # screen.addstr(3,30, str(lastkey))
-            self.win.refresh()
+            # self.win.refresh()
             # if cWin.__signal != 0 : break            
             self.__focus=(self.__focus+1) % len(self.widgets)
         else: #pass the keypress to widget
@@ -158,11 +158,18 @@ class cursesApp(object):
         cWin=self.windows[0]
         print cWin
         cWin.draw()
+        
+        self.__screen.refresh()
+        cWin.win.refresh()
         focus=0
         while True:
-            c = self.__screen.getch()
+            try:
+                c = self.__screen.getch()
+            except KeyboardInterrupt:
+                self.__signal = 2
+            if self.__signal != 0 : break    
             cWin.key_pressed(c)
-            if self.__signal != 0 : break
+            
             # screen.addstr(1,30, str(focus))
             # screen.addstr(2,30, widgets[focus].name)
             # self.win.refresh()
@@ -199,21 +206,6 @@ def define_widgets(parent):
     widgets.append(b0)
     return widgets
      
-def main(stdscr):
-    app=cursesApp(stdscr, callback)
-    
-    mwindow=window("main",0, 0, 0, 0, callback, app)
-    win=mwindow.win
-    app.windows.append(mwindow)
-    # screen = curses.newwin(0, 0, 0, 0)#(23, 79, 0, 0)
-    # screen.bkgd(' ', curses.color_pair(1))
-    # screen.box()
-    # draw_screen(win)
-    widgets=define_widgets(mwindow)
-    # win.addstr(1,30, str(mwindow.widgets))
-    # for widget in widgets:
-    app.loop()
-
 def init_curses():
     stdscr=curses.initscr()
     isColorTerm=True
@@ -239,12 +231,22 @@ if __name__ == '__main__':
     # curses.curs_set(visibility)
     # try:
         # Initialize curses
-        stdscr, isColorTerm=init_curses()
-        global widgets
+    stdscr, isColorTerm=init_curses()
         
-        main(stdscr)                    # Enter the main loop
-        # Set everything back to normal
-        quit_curses(stdscr)
+    app=cursesApp(stdscr, callback)
+    
+    mwindow=window("main",0, 0, 0, 0, callback, app)
+    # win=mwindow.win
+    
+    # screen = curses.newwin(0, 0, 0, 0)#(23, 79, 0, 0)
+    # screen.bkgd(' ', curses.color_pair(1))
+    # screen.box()
+    draw_screen(mwindow.win)
+    widgets=define_widgets(mwindow)
+    # win.addstr(1,30, str(mwindow.widgets))
+    # for widget in widgets:
+    app.loop()
+    quit_curses(stdscr)
     # except:
         # In event of error, restore terminal to sane state.
         # stdscr.keypad(0)
