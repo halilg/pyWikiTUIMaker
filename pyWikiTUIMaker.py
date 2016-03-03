@@ -15,7 +15,7 @@ class widget(object):
         self.parent=parent
         self.win=parent.win
         #register self to parent
-        self.parent.widgets[self.name]=self
+        self.parent.widgets[self.name]=self 
         
     def printLabel(self):
         self.win.addstr(self.posY,self.posX, self.label)
@@ -33,8 +33,8 @@ class wButton(widget):
         self.win.addstr(self.posY,self.posX + 2 , self.label, attr)
     
     def key_pressed(self, c):
-        c = self.win.getch()
-        self.lastKey = c
+        # c = self.win.getch()
+        # self.lastKey = c
         if c in self.__exit_keys:
             self.printField()
             self.parent.callback(self, "click", c)
@@ -78,20 +78,25 @@ class wTextBox(widget):
         self.swin.addstr(0, 0, self.text)
         self.tb=_Textbox(self.swin, insert_mode=True)
 
-        self.win.refresh()
-        self.swin.refresh()
+        # self.win.refresh()
+        # self.swin.refresh()
     
     def key_pressed(self, ch):
         self.tb.do_command(ch)
+        self.swin.refresh()
         
     def printField(self):
         self.win.addstr(self.posY,self.posX + 2 + len(self.label), "[")
         self.win.addstr(self.posY,self.posX + 4 + len(self.label) + self.fieldSize, "]")
         
+    def getText(self):
+        self.text=self.tb.gather()
+        return self.text
+    
     def setFocus(self):
         curses.curs_set(1)
         self.swin.move(0,0)
-        self.text=self.tb.edit()
+        # self.text=self.tb.gather()
         # self.win.addstr(10,1,self.text)
         # self.win.addstr(11,1,str(tb.lastKey))
         return #tb.lastKey
@@ -113,13 +118,15 @@ class window():
         self.win = curses.newwin(y1, x1, y2, x2)#(23, 79, 0, 0)
         self.win.bkgd(' ', curses.color_pair(1))
         self.win.box()
+        self.win.refresh()
         self.__focus=0
         
     def draw(self):
+        
         for w in self.widgets.keys():
             self.widgets[w].printLabel()
             self.widgets[w].printField()
-        self.win.refresh()
+        # self.win.refresh()
 
     def key_pressed(self, key):
         
@@ -127,21 +134,20 @@ class window():
             # screen.addstr(1,30, str(focus))
             # screen.addstr(2,30, widgets[focus].name)
             # self.win.refresh()
+        self.win.addstr(1,35, "   ")
+        self.win.addstr(1,35, str(self.__focus))
+        self.win.refresh()
         iWidget=self.widgets.keys()[self.__focus]
         if key == 9  : #tab, move focus to next widget
-            
-            self.widgets[iWidget].setFocus()
-            # screen.addstr(3,30, str(lastkey))
-            # self.win.refresh()
-            # if cWin.__signal != 0 : break            
             self.__focus=(self.__focus+1) % len(self.widgets)
+            self.widgets[iWidget].setFocus()
         else: #pass the keypress to widget
             self.widgets[iWidget].key_pressed(key)
 
     def callback(self, obj, event, data):
         text = ",".join([obj.name, event, str(data)])
         self.win.addstr(15,1, text)
-        self.win.refresh()
+        # self.win.refresh()
         self.__callback(obj, event, data)
 
 class cursesApp(object):
@@ -156,21 +162,25 @@ class cursesApp(object):
 
     def loop(self):
         cWin=self.windows[0]
-        print cWin
         cWin.draw()
         
-        self.__screen.refresh()
+        # self.__screen.refresh()
         cWin.win.refresh()
+        
         focus=0
         while True:
             try:
-                c = self.__screen.getch()
+                c = cWin.win.getch()
+                cWin.win.addstr(1,30, "   ")
+                cWin.win.addstr(1,30, str(c))
+                cWin.win.refresh()
             except KeyboardInterrupt:
                 self.__signal = 2
-            if self.__signal != 0 : break    
+            if self.__signal != 0 : break
+            
             cWin.key_pressed(c)
             
-            # screen.addstr(1,30, str(focus))
+            
             # screen.addstr(2,30, widgets[focus].name)
             # self.win.refresh()
             # iWidget=cWin.widgets.keys()[focus]
@@ -187,6 +197,7 @@ def draw_screen(win):
     win.addstr(4,1, "Choose File [...]")
     win.addstr(5,1, " Choose Asd [...|v]")
     win.addstr(6,1, "        Age [     ]")
+    win.refresh()
     # win.addstr(8,1, "          [OK]")
 
 def callback(obj, event, data):
