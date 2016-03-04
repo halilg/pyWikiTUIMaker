@@ -26,22 +26,25 @@ class wButton(widget):
         self.label=label
         type="x"
         self.__exit_keys=[curses.KEY_ENTER, 10]
-    
+        self.swin = self.win.subwin(1, len(self.label)+5, self.posY, self.posX) #nlines, ncols, begin_y, begin_x
+
     def printField(self, attr=curses.A_NORMAL): 
-        self.win.addstr(self.posY,self.posX , "[ ", attr)
-        self.win.addstr(self.posY,self.posX + 2 + len(self.label) , " ]", attr)
-        self.win.addstr(self.posY,self.posX + 2 , self.label, attr)
+        self.swin.addstr(0, 0, "[ ", attr)
+        self.swin.addstr(0, len(self.label)+2 , " ]", attr)
+        self.swin.addstr(0, 2, self.label, attr)
+        self.swin.refresh()
     
     def key_pressed(self, c):
-        # c = self.win.getch()
-        # self.lastKey = c
         if c in self.__exit_keys:
             self.printField()
             self.parent.callback(self, "click", c)
     
-    def setFocus(self):
+    def lost_focus(self):
+        self.printField(curses.A_NORMAL)
+        
+    def set_focus(self):
         curses.curs_set(0)
-        self.win.move(self.posY,self.posX + 2)
+        # self.win.move(self.posY,self.posX + 2)
         self.printField(curses.A_REVERSE)
 
 class _Textbox(textpad.Textbox):
@@ -50,22 +53,21 @@ class _Textbox(textpad.Textbox):
     """
     def __init__(*args, **kwargs):
         textpad.Textbox.__init__(*args, **kwargs)
-        lastKey = 0
         
     def do_command(self, ch):
         och=ch
-        if ch == 9: # tab
-            self.lastKey = 9
-            return 0
         if ch == 127: # Backspace
             och=curses.KEY_BACKSPACE
         if ch == 360: # End
             och=562
         if ch == 262: # Home
             och=162
-        self.lastKey = och
+        # if ch == 68: # Home
+        #     och=0#curses.KEY_LEFT
+        # if ch == 67: # Home
+        #     och=0#curses.KEY_RIGHT
         return textpad.Textbox.do_command(self, och)
-
+        
 class wTextBox(widget):
     def __init__(self, name, y, x, size, label, parent, default=""):
         super(self.__class__,self).__init__(name, y, x, label, parent) # Call the init method of the base class
@@ -74,13 +76,10 @@ class wTextBox(widget):
         self.text=default
         if len(self.text) > self.fieldSize: self.text = self.text[:self.fieldSize]
         self.type="t"
-        self.swin = self.win.subwin(1, self.fieldSize+1, self.posY,self.posX + 3 + len(self.label)) #nlines, ncols, begin_y, begin_x
+        self.swin = self.win.subwin(1, self.fieldSize+1, self.posY, self.posX + 3 + len(self.label)) #nlines, ncols, begin_y, begin_x
         self.swin.addstr(0, 0, self.text)
         self.tb=_Textbox(self.swin, insert_mode=True)
 
-        # self.win.refresh()
-        # self.swin.refresh()
-    
     def key_pressed(self, ch):
         self.tb.do_command(ch)
         self.swin.refresh()
@@ -93,13 +92,14 @@ class wTextBox(widget):
         self.text=self.tb.gather()
         return self.text
     
-    def setFocus(self):
+    def lost_focus(self):
+        pass
+    
+    def set_focus(self):
         curses.curs_set(1)
-        self.swin.move(0,0)
-        # self.text=self.tb.gather()
-        # self.win.addstr(10,1,self.text)
-        # self.win.addstr(11,1,str(tb.lastKey))
-        return #tb.lastKey
+        # (y, x) = self.tb.getyx()
+        # self.tb.win.move(0, 0)
+        self.swin.refresh()
 
 class window():
     def __init__(self, name, y1, x1, y2, x2, callback, parent, label=""):
@@ -109,45 +109,40 @@ class window():
         self.__parent = parent
         self.__parent.windows.append(self)
         # self.screen=screen
-        self.y1=y1
-        self.x1=x1
-        self.y2=y2
-        self.x2=x2
+        # self.y1=y1
+        # self.x1=x1
+        # self.y2=y2
+        # self.x2=x2
         self.label=label
         self.widgets=OrderedDict()
         self.win = curses.newwin(y1, x1, y2, x2)#(23, 79, 0, 0)
         self.win.bkgd(' ', curses.color_pair(1))
         self.win.box()
-        self.win.refresh()
         self.__focus=0
+
+    def signal(self, sig):
+        self.__parent.signal(sig)
         
     def draw(self):
-        
         for w in self.widgets.keys():
             self.widgets[w].printLabel()
             self.widgets[w].printField()
+        # q=self.win.getch()
+        self.widgets[self.widgets.keys()[self.__focus]].set_focus()
         # self.win.refresh()
 
     def key_pressed(self, key):
-        
-        # while True:
-            # screen.addstr(1,30, str(focus))
-            # screen.addstr(2,30, widgets[focus].name)
-            # self.win.refresh()
-        self.win.addstr(1,35, "   ")
-        self.win.addstr(1,35, str(self.__focus))
-        self.win.refresh()
         iWidget=self.widgets.keys()[self.__focus]
         if key == 9  : #tab, move focus to next widget
+            self.widgets[iWidget].lost_focus()
             self.__focus=(self.__focus+1) % len(self.widgets)
-            self.widgets[iWidget].setFocus()
+            iWidget=self.widgets.keys()[self.__focus]
+            self.widgets[iWidget].set_focus()
         else: #pass the keypress to widget
             self.widgets[iWidget].key_pressed(key)
 
     def callback(self, obj, event, data):
         text = ",".join([obj.name, event, str(data)])
-        self.win.addstr(15,1, text)
-        # self.win.refresh()
         self.__callback(obj, event, data)
 
 class cursesApp(object):
@@ -163,33 +158,19 @@ class cursesApp(object):
     def loop(self):
         cWin=self.windows[0]
         cWin.draw()
-        
-        # self.__screen.refresh()
-        cWin.win.refresh()
-        
-        focus=0
         while True:
             try:
                 c = cWin.win.getch()
-                cWin.win.addstr(1,30, "   ")
-                cWin.win.addstr(1,30, str(c))
-                cWin.win.refresh()
+                # cWin.win.addstr(1,30, "         ")
+                # cWin.win.addstr(1,30, str(focus))
+                # cWin.win.refresh()
             except KeyboardInterrupt:
                 self.__signal = 2
-            if self.__signal != 0 : break
+                break
             
             cWin.key_pressed(c)
+            if self.__signal != 0 : break
             
-            
-            # screen.addstr(2,30, widgets[focus].name)
-            # self.win.refresh()
-            # iWidget=cWin.widgets.keys()[focus]
-            # cWin.widgets[iWidget].setFocus()
-            # lastkey=cWin.widgets[iWidget].lastKey
-            # screen.addstr(3,30, str(lastkey))
-            # cWin.win.refresh()
-            # if cWin.__signal != 0 : break            
-            # focus=(focus+1) % len(cWin.widgets)
 
 def draw_screen(win):
     # win.addstr(2,1, "       Name [     ]")
@@ -209,13 +190,9 @@ def callback(obj, event, data):
 
 def define_widgets(parent):
     widgets = []
-    t0=wTextBox("t0", 2, 7, 10, "Name", parent, "12345678901")
-    t1=wTextBox("t1", 9, 7, 10, "Surname", parent)
-    b0=wButton("b0", 8, 10, "OK", parent)
-    widgets.append(t0)
-    widgets.append(t1)
-    widgets.append(b0)
-    return widgets
+    t0=wTextBox("t0", 2, 7, 10, "Name", parent, "1234567890")
+    t1=wTextBox("t1", 8, 7, 10, "Surname", parent)
+    b0=wButton("b0", 10, 10, "OK", parent)
      
 def init_curses():
     stdscr=curses.initscr()
@@ -253,7 +230,7 @@ if __name__ == '__main__':
     # screen.bkgd(' ', curses.color_pair(1))
     # screen.box()
     draw_screen(mwindow.win)
-    widgets=define_widgets(mwindow)
+    define_widgets(mwindow)
     # win.addstr(1,30, str(mwindow.widgets))
     # for widget in widgets:
     app.loop()
